@@ -423,6 +423,7 @@ jobs:
           - deb
           - rpm
           - AppImage
+          - snap
           - tar.xz
     defaults:
       run:
@@ -446,8 +447,47 @@ jobs:
       - name: fix premissions
         run: chmod +x unpacked/icalingua
 
+      - name: refresh snaps
+        run: sudo snap refresh
+
+      # - name: Install Snapcraft
+      #   uses: samuelmeuli/action-snapcraft@v1
+      #   env:
+      #     SNAPCRAFT_BUILD_ENVIRONMENT: lxd
+      #   if: ${{ matrix.package == 'snap' }}
+      #   with:
+      #     use_lxd: true
+
+      # - name: Install Snapcraft
+      #   uses: samuelmeuli/action-electron-builder@v1
+      #   env:
+      #     SNAPCRAFT_BUILD_ENVIRONMENT: lxd
+      #   if: ${{ matrix.package == 'snap' }}
+      #   with:
+      #     skip_build: true
+      #     package_root: icalingua
+      #     max_attempts: 0
+
+      - name: Install Snapcraft
+        run: |
+          sudo snap install snapcraft --classic
+          sudo snap install lxd
+          sudo usermod --append --groups lxd $USER
+          sudo chown root:root /
+          sudo /snap/bin/lxd waitready
+          sudo /snap/bin/lxd init --auto
+          newgrp
+        if: ${{ matrix.package == 'snap' }}
+
       - name: pack
         run: yarn build:electron --pd unpacked -l ${{ matrix.package }}
+        if: ${{ matrix.package != 'snap' }}
+
+      - name: pack (SNAP)
+        run: sg lxd -c 'yarn build:electron --pd unpacked -l ${{ matrix.package }}'
+        if: ${{ matrix.package == 'snap' }}
+        env:
+          SNAPCRAFT_BUILD_ENVIRONMENT: lxd
 
       - uses: actions/upload-artifact@v2
         name: upload ${{ matrix.package }}
@@ -465,6 +505,7 @@ jobs:
           - deb
           - rpm
           - AppImage
+          - snap
           - tar.xz
     defaults:
       run:
@@ -507,6 +548,7 @@ jobs:
           - deb
           - rpm
           - AppImage
+          - snap
           - tar.xz
     defaults:
       run:
@@ -670,6 +712,12 @@ jobs:
           name: arm64.AppImage
           path: release
 
+      - name: get arm64.snap
+        uses: actions/download-artifact@v2
+        with:
+          name: arm64.snap
+          path: release
+
       - name: get arm64.deb
         uses: actions/download-artifact@v2
         with:
@@ -700,6 +748,12 @@ jobs:
           name: ia32.AppImage
           path: release
 
+      - name: get ia32.snap
+        uses: actions/download-artifact@v2
+        with:
+          name: ia32.snap
+          path: release
+
       - name: get ia32.tar.xz
         uses: actions/download-artifact@v2
         with:
@@ -722,6 +776,12 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: x86_64.AppImage
+          path: release
+
+      - name: get x86_64.snap
+        uses: actions/download-artifact@v2
+        with:
+          name: x86_64.snap
           path: release
 
       - name: get x86_64.tar.xz
