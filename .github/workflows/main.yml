@@ -414,17 +414,9 @@ jobs:
           path: '*-aarch64.pkg.*'
           if-no-files-found: error
 
-  pack-otherpkg-x86_64:
+  pack-snap-x86_64:
     runs-on: ubuntu-latest
     needs: build-x86_64
-    strategy:
-      matrix:
-        package:
-          - deb
-          - rpm
-          - AppImage
-          - snap
-          - tar.xz
     defaults:
       run:
         working-directory: icalingua
@@ -446,7 +438,6 @@ jobs:
 
       - name: fix premissions
         run: chmod +x unpacked/icalingua
-
       - name: refresh snaps
         run: sudo snap refresh
 
@@ -477,17 +468,53 @@ jobs:
           sudo /snap/bin/lxd waitready
           sudo /snap/bin/lxd init --auto
           newgrp
-        if: ${{ matrix.package == 'snap' }}
+
+      - name: pack
+        run: sg lxd -c 'yarn build:electron --pd unpacked -l snap'
+        env:
+          SNAPCRAFT_BUILD_ENVIRONMENT: lxd
+
+      - uses: actions/upload-artifact@v2
+        name: upload snap
+        with:
+          name: x86_64.snap
+          path: icalingua/build/*.snap
+          if-no-files-found: error
+
+  pack-otherpkg-x86_64:
+    runs-on: ubuntu-latest
+    needs: build-x86_64
+    strategy:
+      matrix:
+        package:
+          - deb
+          - rpm
+          - AppImage
+          - tar.xz
+    defaults:
+      run:
+        working-directory: icalingua
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v2.3.0
+
+      - uses: Clansty/gha-yarn-node-cache@master
+        env:
+          WORKING_DIR: icalingua
+
+      - name: get built files
+        uses: actions/download-artifact@v2
+        with:
+          name: x86_64-unpacked
+          path: icalingua/unpacked
+
+      - name: fix premissions
+        run: chmod +x unpacked/icalingua
 
       - name: pack
         run: yarn build:electron --pd unpacked -l ${{ matrix.package }}
-        if: ${{ matrix.package != 'snap' }}
-
-      - name: pack (SNAP)
-        run: sg lxd -c 'yarn build:electron --pd unpacked -l ${{ matrix.package }}'
-        if: ${{ matrix.package == 'snap' }}
-        env:
-          SNAPCRAFT_BUILD_ENVIRONMENT: lxd
 
       - uses: actions/upload-artifact@v2
         name: upload ${{ matrix.package }}
